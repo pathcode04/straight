@@ -148,6 +148,23 @@
       line-height: 1.5;
     }
 
+    .refs {
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+      font-size: 0.8rem;
+      color: var(--sub);
+      line-height: 1.5;
+    }
+
+    .refs a {
+      color: #0b5db8;
+      text-decoration: none;
+    }
+
+    .refs a:hover {
+      text-decoration: underline;
+    }
+
     .toolbar {
       display: flex;
       flex-wrap: wrap;
@@ -209,6 +226,13 @@
         </div>
 
         <p class="mini">참고: 최초 1회는 로컬 음성모델(Whisper tiny) 로딩으로 시간이 걸릴 수 있습니다.</p>
+        <div class="refs">
+          이론/근거 출처:
+          <a href="https://www.q-net.or.kr/cst006.do?artlSeq=5213181&brdId=Q006&code=1202&gId=&gSite=Q&id=cst00602" target="_blank" rel="noreferrer">Q-Net 직업상담사2급 출제기준(2025~2027)</a>,
+          <a href="https://www.onetcenter.org/IP.html" target="_blank" rel="noreferrer">O*NET Interest Profiler(RIASEC)</a>,
+          <a href="https://www.oecd.org/en/topics/career-guidance.html" target="_blank" rel="noreferrer">OECD Career Guidance</a>,
+          <a href="https://www.work24.go.kr/" target="_blank" rel="noreferrer">고용24</a>
+        </div>
       </div>
     </section>
 
@@ -407,6 +431,32 @@
       return ranked;
     }
 
+    function buildTheoryDrivenInterpretation(topics, emotion, needs) {
+      const topicKeys = topics.map((t) => t.key);
+      const lines = [];
+
+      // Holland RIASEC: interest-job fit based interpretation
+      if (topicKeys.some((k) => k.includes("희망직종") || k.includes("직업군") || k.includes("진로결정"))) {
+        lines.push("- Holland(RIASEC) 관점: 흥미-직무 적합성을 우선 확인하고, 희망직종과 실제 직무환경의 일치도를 점검.");
+      }
+
+      // SCCT: self-efficacy / outcome expectation / barriers
+      if (emotion.score >= 40 || topicKeys.includes("제약요인") || needs.includes("심리·정서 지원")) {
+        lines.push("- SCCT 관점: 자기효능감 저하 및 장벽 인식을 완화하도록 단계별 과제와 성공경험 설계를 권장.");
+      }
+
+      // Career development/lifespan (Super style) practical interpretation
+      if (topicKeys.some((k) => k.includes("경력전환") || k.includes("취업준비") || k.includes("역량개발"))) {
+        lines.push("- 생애 진로발달 관점: 현재 경력단계에 맞춘 탐색-준비-전환 계획을 분리해 실행.");
+      }
+
+      if (!lines.length) {
+        lines.push("- 진로발달 기본 관점: 흥미·역량·노동시장 정보를 통합해 현실적인 대안 탐색을 진행.");
+      }
+
+      return lines.join("\n");
+    }
+
     function normalizeSpeakerPrefix(line) {
       return line.replace(/^\s*(상담사|상담원|주무관|코치|컨설턴트|센터|구직자|내담자|참여자|민원인)\s*[:：]\s*/i, "").trim();
     }
@@ -441,6 +491,7 @@
       const topicText = topics.length ? topics.map((t) => t.key).join(", ") : "핵심 토픽 탐지 제한";
       const needsText = needs.join(", ");
       const summaryText = summaryLines.length ? summaryLines.map((s) => `- ${s}`).join("\n") : "- 요약 근거 문장 부족";
+      const theoryInterpretation = buildTheoryDrivenInterpretation(topics, emotion, needs);
 
       return [
         "[직업상담 자동 일지 초안]",
@@ -454,6 +505,10 @@
         `- ${topicText}`,
         "3) 지원 니즈",
         `- ${needsText}`,
+        "",
+        "[진로발달/상담 이론 반영]",
+        theoryInterpretation,
+        "- 적용 근거: 공공분야 활용 기준(고용24 서비스 체계) 및 직업상담사 국가자격 출제기준에서 통용되는 이론 프레임을 참고.",
         "",
         "[심리/정서 분석]",
         `- 불안도/감정 상태: ${emotion.level} (${emotion.score}/100)`,
