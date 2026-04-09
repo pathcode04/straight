@@ -390,6 +390,28 @@
     const COUNSELOR_TAGS = ["상담사", "상담원", "주무관", "코치", "컨설턴트", "센터"];
     const SEEKER_TAGS = ["구직자", "내담자", "참여자", "민원인"];
     const COUNSELOR_HINTS = ["어떠세요", "생각하시나요", "가능할까요", "안내", "확인", "권유", "추천", "연계", "진행해보죠"];
+    const RIASEC_RULES = {
+      R: ["기계", "현장", "조립", "운전", "설비", "실습", "정비", "제작"],
+      I: ["분석", "연구", "데이터", "문제해결", "개발", "탐구", "기술직", "프로그래밍"],
+      A: ["디자인", "창작", "예술", "콘텐츠", "브랜드", "글쓰기", "영상", "기획"],
+      S: ["상담", "교육", "도움", "복지", "서비스", "돌봄", "협업", "소통"],
+      E: ["영업", "리더", "창업", "마케팅", "기획", "설득", "성과", "관리"],
+      C: ["사무", "회계", "행정", "문서", "정리", "규정", "절차", "정확"]
+    };
+    const CAREER_STATE_RULES = [
+      { key: "미결정/혼란", words: ["모르겠", "막막", "결정이 어렵", "혼란", "갈피"] },
+      { key: "탐색 단계", words: ["찾아보", "탐색", "비교", "알아보", "정보수집"] },
+      { key: "선택/결정 단계", words: ["결정", "선택", "정했", "방향"] },
+      { key: "준비/실행 단계", words: ["지원", "준비", "면접", "이력서", "실행", "도전"] },
+      { key: "전환 단계", words: ["이직", "전환", "재취업", "퇴사"] }
+    ];
+    const VALUE_RULES = [
+      { key: "안정성 가치", words: ["안정", "정규직", "복지", "연금", "고용안정"] },
+      { key: "보상/처우 가치", words: ["연봉", "급여", "보수", "수당", "처우"] },
+      { key: "성장/성취 가치", words: ["성장", "성취", "발전", "경력개발", "도전"] },
+      { key: "의미/적합 가치", words: ["의미", "적성", "보람", "흥미", "맞는일"] },
+      { key: "워라밸/생활 가치", words: ["워라밸", "근무시간", "가정", "육아", "생활균형"] }
+    ];
 
     let asrPromise = null;
     let recorder = null;
@@ -469,7 +491,7 @@
         cls = "mid";
       }
 
-      return { score, level, cls };
+      return { score, level, cls, pos, neg };
     }
 
     function summarize(text) {
@@ -494,6 +516,52 @@
       .map((x) => x.sentence);
 
       return ranked;
+    }
+
+    function analyzeInterestType(text) {
+      const score = Object.entries(RIASEC_RULES).map(([code, words]) => {
+        let point = 0;
+        for (const w of words) {
+          if (includesStem(text, w)) point += 1;
+        }
+        return { code, point };
+      }).sort((a, b) => b.point - a.point);
+
+      const top = score.filter((x) => x.point > 0).slice(0, 3);
+      if (!top.length) return { label: "판별 제한", detail: "흥미유형 키워드가 충분하지 않음" };
+
+      const code = top.map((x) => x.code).join("");
+      return {
+        label: `${code} 유형`,
+        detail: top.map((x) => `${x.code}(${x.point})`).join(", ")
+      };
+    }
+
+    function analyzeCareerDecisionState(text) {
+      const scored = CAREER_STATE_RULES.map((rule) => {
+        let point = 0;
+        for (const w of rule.words) {
+          if (includesStem(text, w)) point += 1;
+        }
+        return { key: rule.key, point };
+      }).sort((a, b) => b.point - a.point);
+
+      const top = scored[0];
+      if (!top || top.point === 0) return "판별 제한(추가 면담 필요)";
+      return top.key;
+    }
+
+    function analyzeCoreValues(text) {
+      const scored = VALUE_RULES.map((rule) => {
+        let point = 0;
+        for (const w of rule.words) {
+          if (includesStem(text, w)) point += 1;
+        }
+        return { key: rule.key, point };
+      }).filter((v) => v.point > 0).sort((a, b) => b.point - a.point);
+
+      if (!scored.length) return ["가치관 단서 부족(추가 탐색 필요)"];
+      return scored.slice(0, 2).map((v) => `${v.key}(${v.point})`);
     }
 
     function buildTheoryDrivenInterpretation(topics, emotion, needs) {
@@ -552,7 +620,7 @@
       return extracted.join("\n");
     }
 
-    function buildJournal(text, topics, emotion, needs, summaryLines) {
+    function buildJournal(text, topics, emotion, needs, summaryLines, profile) {
       const topicText = topics.length ? topics.map((t) => t.key).join(", ") : "핵심 토픽 탐지 제한";
       const needsText = needs.join(", ");
       const summaryText = summaryLines.length ? summaryLines.map((s) => `- ${s}`).join("\n") : "- 요약 근거 문장 부족";
@@ -568,7 +636,11 @@
         `${summaryLines[0] || "구직/진로 관련 어려움과 지원 필요를 표현함."}`,
         "2) 핵심 진로 토픽",
         `- ${topicText}`,
-        "3) 지원 니즈",
+        "3) 흥미유형/진로선택/가치관 분석",
+        `- 흥미유형(RIASEC 추정): ${profile.interest.label} / 근거: ${profile.interest.detail}`,
+        `- 진로선택 상태: ${profile.decisionState}`,
+        `- 중요 가치관: ${profile.values.join(", ")}`,
+        "4) 지원 니즈",
         `- ${needsText}`,
         "",
         "[진로발달/상담 이론 반영]",
@@ -577,7 +649,7 @@
         "",
         "[심리/정서 분석]",
         `- 불안도/감정 상태: ${emotion.level} (${emotion.score}/100)`,
-        "- 해석: 정서표현 빈도와 진로갈등 표현을 기반으로 초기 추정",
+        `- 정서 해석: 긍정단서 ${emotion.pos}건, 부정단서 ${emotion.neg}건이 관찰됨`,
         "- 유의: 위기 신호는 자동결과만으로 확정하지 않고 면담으로 재확인",
         "",
         "[다음 회기 개입 전략]",
@@ -597,16 +669,28 @@
       const needs = pickNeeds(text);
       const emotion = emotionScore(text);
       const summaryLines = summarize(text);
+      const profile = {
+        interest: analyzeInterestType(text),
+        decisionState: analyzeCareerDecisionState(text),
+        values: analyzeCoreValues(text)
+      };
 
       ids.topicOut.value = topics.length
-        ? topics.map((t, i) => `${i + 1}. ${t.key} (신호 ${t.score})`).join("\n")
+        ? [
+            ...topics.map((t, i) => `${i + 1}. ${t.key} (신호 ${t.score})`),
+            `- 흥미유형(RIASEC 추정): ${profile.interest.label}`,
+            `- 진로선택 상태: ${profile.decisionState}`
+          ].join("\n")
         : "탐지된 주요 토픽이 없습니다.";
 
-      ids.emotionOut.value = `${emotion.level} (${emotion.score}/100)\n근거: 부정 정서 표현 빈도와 진로갈등 표현을 기준으로 추정`;
+      ids.emotionOut.value = `${emotion.level} (${emotion.score}/100)\n근거: 긍정단서 ${emotion.pos}건 / 부정단서 ${emotion.neg}건`;
       ids.anxietyBadge.innerHTML = `<span class="pill ${emotion.cls}">${emotion.level}</span>`;
 
-      ids.needsOut.value = needs.map((n, i) => `${i + 1}. ${n}`).join("\n");
-      ids.journalOut.value = buildJournal(text, topics, emotion, needs, summaryLines);
+      ids.needsOut.value = [
+        ...needs.map((n, i) => `${i + 1}. ${n}`),
+        `- 중요 가치관: ${profile.values.join(", ")}`
+      ].join("\n");
+      ids.journalOut.value = buildJournal(text, topics, emotion, needs, summaryLines, profile);
     }
 
     async function getAsr() {
