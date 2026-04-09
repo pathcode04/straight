@@ -15,8 +15,13 @@
 - 상담 일지 자동 생성
   - 실무형 요약문 자동 작성
   - 화자 혼합 녹취에서 `구직자 추출` 버튼으로 구직자 발화 우선 분리
+  - 진로발달/진로상담 이론 반영 자동 해석
+    - `Holland(RIASEC)` 관점
+    - `SCCT`(사회인지 진로이론) 관점
+    - `생애 진로발달` 관점(현 단계 탐색-준비-전환)
   - 구조화 출력 섹션 제공
     - `공식 상담일지(구조화)`
+    - `진로발달/상담 이론 반영`
     - `심리/정서 분석`
     - `다음 회기 개입 전략`
   - 결과 텍스트 직접 수정 가능
@@ -61,6 +66,17 @@ cd straight
 - 분석 결과는 브라우저 메모리에서 처리됩니다.
 - 다만 최초 모델 로딩 시 모델 파일 다운로드를 위해 네트워크 연결이 필요할 수 있습니다.
 - 민감 개인정보(주민등록번호, 상세 주소, 건강정보 등) 직접 입력은 지양하세요.
+
+## 이론/근거 출처
+
+- Q-Net 직업상담사2급 출제기준(2025~2027):
+  - https://www.q-net.or.kr/cst006.do?artlSeq=5213181&brdId=Q006&code=1202&gId=&gSite=Q&id=cst00602
+- O*NET Interest Profiler(RIASEC):
+  - https://www.onetcenter.org/IP.html
+- OECD Career Guidance:
+  - https://www.oecd.org/en/topics/career-guidance.html
+- 고용24(고용서비스 연계):
+  - https://www.work24.go.kr/
 
 ## 브라우저 호환/제약
 
